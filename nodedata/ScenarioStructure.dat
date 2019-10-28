@@ -1,0 +1,42 @@
+set Stages := FirstStage SecondStage ;
+
+set Nodes := RootNode
+             N1
+             N2
+             N3 ;
+
+param NodeStage := RootNode         FirstStage
+                   N1               SecondStage
+                   N2               SecondStage
+                   N3               SecondStage ;
+
+set Children[RootNode] := N1
+                          N2
+                          N3 ;
+
+param ConditionalProbability := RootNode          1.0
+                                N1                0.33333333
+                                N2                0.33333334
+                                N3                0.33333333 ;
+
+set Scenarios := S1
+                 S2
+                 S3 ;
+
+param ScenarioLeafNode :=
+                    S1         N1
+                    S2         N2
+                    S3         N3 ;
+
+set StageVariables[FirstStage] :=  x[*,*]
+                                   c[*,*]
+                                   d[*,*]
+                                   u_sch[*]
+                                   p_pm_pred[*];
+
+set StageVariables[SecondStage] := ;
+
+param StageCost := FirstStage  FirstStageCost
+                   SecondStage SecondStageCost ;
+
+param ScenarioBasedData := False ;

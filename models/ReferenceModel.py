@@ -1,6 +1,8 @@
 
 from pyomo.environ import *
 import numpy as np
+import random
+import matplotlib.pyplot as plt
 
 #
 # Model
@@ -32,10 +34,13 @@ model.l_pred = Param(model.T, within=PositiveReals)
 
 model.p_da_pred = Param(model.T, within=PositiveReals)
 
-model.p_da_act = Param(model.T, within=PositiveReals)
-
 model.gradient = Param(within=PositiveReals)
 
+model.alpha = Param(initialize=0.95, within=PositiveReals)
+
+model.beta = Param(initialize=10, within=PositiveReals)
+
+scenarios = 500
 
 
 #
@@ -57,6 +62,14 @@ model.d = Var(model.T, model.i, bounds=power_bounds_rule)
 model.u_sch = Var(model.T)
 
 model.p_pm_pred = Var(model.T)
+
+model.p_da_act = Var(model.T)
+
+model.z = Var()
+
+model.prices = Var(range(scenarios))
+
+model.cvar = Var()
 
 
 #
@@ -91,12 +104,42 @@ def p_pm_rule(model, t):
 model.p_pm_constraint = Constraint(model.T, rule=p_pm_rule)
 
 
+def random_price_matrix_rule(model, s, t):
+    return model.p_da_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05)
+
+model.scenarios = Param(range(scenarios), model.T, initialize=random_price_matrix_rule)
+
+
+def cvar_rule(model, i):
+    return model.z <= sum(model.scenarios[i,t] * model.u_sch[t] for t in model.T)
+
+model.cvar_constraint = Constraint(range(scenarios), rule=cvar_rule)
+
+
+def random_price_rule(model, t):
+    return model.p_da_act[t] == model.p_da_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05)
+
+model.p_da_act_constraint = Constraint(model.T, rule=random_price_rule)
+
+
+def prices_calculation_rule(model, i):
+    return model.prices[i] == sum(model.scenarios[i,t] * model.u_sch[t] for t in model.T)
+
+model.prices_constraint = Constraint(range(scenarios), rule=prices_calculation_rule)
+
+def cvar_calculation_rule(model):
+    return model.cvar == (model.z + (1/(1 - model.alpha)) * \
+                          (sum((1/scenarios) * (model.prices[i] - model.z) for i in range(scenarios))))
+
+model.cvar_calculation_constraint = Constraint(rule=cvar_calculation_rule)
+
 #
 # Stage-specific cost computations
 #
 
 def ComputeFirstStageCost_rule(model):
-    return 0
+    return (model.z + (1/(1 - model.alpha)) * \
+                          (sum(((1/scenarios) * (model.prices[i] - model.z)) for i in range(scenarios))))
 
 model.FirstStageCost = Expression(rule=ComputeFirstStageCost_rule)
 
@@ -111,7 +154,9 @@ model.SecondStageCost = Expression(rule=ComputeSecondStageCost_rule)
 #
 
 def day_ahead_obj_rule(model):
-    return sum(model.u_sch[t] * model.p_da_pred[t] for t in model.T)
+    return sum(model.u_sch[t] * model.p_da_pred[t] for t in model.T) + \
+           model.beta * (model.z + (1/(1 - model.alpha)) *
+                         sum(1/scenarios * (sum(model.scenarios[i,t] * model.u_sch[t] for t in model.T) - model.z) for i in range(scenarios)))
 
 model.day_ahead_rule = Objective(rule=day_ahead_obj_rule)
 

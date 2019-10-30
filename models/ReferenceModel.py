@@ -166,3 +166,4 @@ def day_ahead_obj_rule(model):
 
 model.day_ahead_rule = Objective(rule=day_ahead_obj_rule, sense=minimize)
 
+

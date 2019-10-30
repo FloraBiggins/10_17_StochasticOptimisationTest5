@@ -71,6 +71,8 @@ model.prices = Var(range(scenarios))
 
 model.cvar = Var()
 
+model.y = Var(range(scenarios))
+
 
 #
 # Constraints
@@ -110,10 +112,15 @@ def random_price_matrix_rule(model, s, t):
 model.scenarios = Param(range(scenarios), model.T, initialize=random_price_matrix_rule)
 
 
-def cvar_rule(model, i):
-    return model.z <= sum(model.scenarios[i,t] * model.u_sch[t] for t in model.T)
+def cvar_first_rule(model, i):
+    return sum(model.scenarios[i,t] * model.u_sch[t] for t in model.T) - model.z - model.y[i] <= 0
 
-model.cvar_constraint = Constraint(range(scenarios), rule=cvar_rule)
+model.cvar_first_constraint = Constraint(range(scenarios), rule=cvar_first_rule)
+
+def cvar_second_rule(model, i):
+    return model.y[i] >= 0
+
+model.cvar_second_constraint = Constraint(range(scenarios), rule=cvar_second_rule)
 
 
 def random_price_rule(model, t):
@@ -128,8 +135,8 @@ def prices_calculation_rule(model, i):
 model.prices_constraint = Constraint(range(scenarios), rule=prices_calculation_rule)
 
 def cvar_calculation_rule(model):
-    return model.cvar == (model.z + (1/(1 - model.alpha)) * \
-                          (sum((1/scenarios) * (model.prices[i] - model.z) for i in range(scenarios))))
+    return model.cvar == (model.z +
+                          (1/(1 - model.alpha)) * (1/scenarios) * (sum(model.y[i] for i in range(scenarios))))
 
 model.cvar_calculation_constraint = Constraint(rule=cvar_calculation_rule)
 
@@ -138,8 +145,7 @@ model.cvar_calculation_constraint = Constraint(rule=cvar_calculation_rule)
 #
 
 def ComputeFirstStageCost_rule(model):
-    return (model.z + (1/(1 - model.alpha)) * \
-                          (sum(((1/scenarios) * (model.prices[i] - model.z)) for i in range(scenarios))))
+    return model.z + (1/(1 - model.alpha)) * 1/scenarios * (sum(model.y[i] for i in range(scenarios)))
 
 model.FirstStageCost = Expression(rule=ComputeFirstStageCost_rule)
 
@@ -155,8 +161,8 @@ model.SecondStageCost = Expression(rule=ComputeSecondStageCost_rule)
 
 def day_ahead_obj_rule(model):
     return sum(model.u_sch[t] * model.p_da_pred[t] for t in model.T) + \
-           model.beta * (model.z + (1/(1 - model.alpha)) *
-                         sum(1/scenarios * (sum(model.scenarios[i,t] * model.u_sch[t] for t in model.T) - model.z) for i in range(scenarios)))
+           model.beta * (model.z + \
+                         (1/(1 - model.alpha)) * 1/scenarios * sum(model.y[i] for i in range(scenarios)))
 
-model.day_ahead_rule = Objective(rule=day_ahead_obj_rule)
+model.day_ahead_rule = Objective(rule=day_ahead_obj_rule, sense=minimize)
 

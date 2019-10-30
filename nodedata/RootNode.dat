@@ -67,3 +67,8 @@ param p_da_pred :=
 23    53.07;
 
 param gradient := 0.004 ;
+
+param alpha := 0.95 ;
+
+param beta := 10 ;
+

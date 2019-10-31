@@ -1,8 +1,6 @@
 
 from pyomo.environ import *
-import numpy as np
 import random
-import matplotlib.pyplot as plt
 
 #
 # Model
@@ -40,12 +38,15 @@ model.alpha = Param(initialize=0.95, within=PositiveReals)
 
 model.beta = Param(initialize=10, within=PositiveReals)
 
-scenarios = 500
+price_scenarios = 200
 
+load_scenarios = 10
 
 #
 # Variables
 #
+
+# Energy Storage Variable
 
 def capacity_bounds_rule(model, t, i):
     return (model.l_SOC[i] * model.capacity[i], model.u_SOC[i] * model.capacity[i])
@@ -61,24 +62,38 @@ model.d = Var(model.T, model.i, bounds=power_bounds_rule)
 
 model.u_sch = Var(model.T)
 
+# Price Variables
+
 model.p_pm_pred = Var(model.T)
 
 model.p_da_act = Var(model.T)
 
-model.z = Var()
+model.prices = Var(range(price_scenarios), range(load_scenarios))
 
-model.prices = Var(range(scenarios))
+model.pred_cost = Var()
+
+# Load Variables
+
+model.load_scenarios = Var(range(load_scenarios), model.T)
+
+model.l_act = Var(model.T)
+
+# CVaR Variables
 
 model.cvar = Var()
 
-model.y = Var(range(scenarios))
+model.z = Var()
 
-model.pred_cost = Var()
+model.y = Var(range(price_scenarios), range(load_scenarios))
 
 
 #
 # Constraints
 #
+
+
+# Storage Constraints
+
 
 def initial_soc_rule(model, i):
     return model.x[23,i] == model.l_SOC[i] * model.capacity[i]
@@ -101,34 +116,22 @@ def u_scheduling_rule(model, t):
 model.u_scheduling_constraint = Constraint(model.T, rule=u_scheduling_rule)
 
 def p_pm_rule(model, t):
-    return model.p_pm_pred[t] == model.p_da_pred[t] + model.gradient * ((model.l_pred[t]/1000) +
-                                                            sum(model.c[t,i] - model.efficiency_d[i]
-                                                                * model.d[t,i] for i in model.i))
+    return model.p_pm_pred[t] == model.p_da_pred[t] + model.gradient * model.u_sch[t]
 
 model.p_pm_constraint = Constraint(model.T, rule=p_pm_rule)
+
+
+# Price Prediction, Scenario Matrix and Actual Price Scenario
 
 def cost_prediction_rule(model):
     return model.pred_cost == sum(model.p_da_pred[t] * model.u_sch[t] for t in model.T)
 
 model.cost_prediction = Constraint(rule=cost_prediction_rule)
 
-
 def random_price_matrix_rule(model, s, t):
     return model.p_da_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05)
 
-model.scenarios = Param(range(scenarios), model.T, initialize=random_price_matrix_rule)
-
-
-def cvar_first_rule(model, i):
-    return sum(model.scenarios[i,t] * model.u_sch[t] for t in model.T) - model.z - model.y[i] <= 0
-
-model.cvar_first_constraint = Constraint(range(scenarios), rule=cvar_first_rule)
-
-def cvar_second_rule(model, i):
-    return model.y[i] >= 0
-
-model.cvar_second_constraint = Constraint(range(scenarios), rule=cvar_second_rule)
-
+model.price_scenarios = Param(range(price_scenarios), model.T, initialize=random_price_matrix_rule)
 
 def random_price_rule(model, t):
     return model.p_da_act[t] == model.p_da_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05)
@@ -136,28 +139,62 @@ def random_price_rule(model, t):
 model.p_da_act_constraint = Constraint(model.T, rule=random_price_rule)
 
 
-def prices_calculation_rule(model, i):
-    return model.prices[i] == sum(model.scenarios[i,t] * model.u_sch[t] for t in model.T)
+# Load Scenario Matrix and Actual Load
 
-model.prices_constraint = Constraint(range(scenarios), rule=prices_calculation_rule)
+def random_load_matrix_rule(model, s, t):
+    return model.load_scenarios[s, t] == (model.l_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05))/1000 + \
+           sum(model.c[t, i] - model.efficiency_d[i] * model.d[t, i] for i in model.i)
+
+model.load_scenarios_constraint = Constraint(range(load_scenarios), model.T, rule=random_load_matrix_rule)
+
+
+def random_load_rule(model, t):
+    return model.l_act[t] == model.l_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05)
+
+model.l_act_constraint = Constraint(model.T, rule=random_load_rule)
+
+
+# Total Cost Scenario Matrix for All Possible Loads and Prices
+
+def prices_calculation_rule(model, s1, s2):
+    return model.prices[s1,s2] == sum(model.price_scenarios[s1,t] * model.load_scenarios[s2,t] for t in model.T)
+
+model.price_calculations = Constraint(range(price_scenarios), range(load_scenarios), rule=prices_calculation_rule)
+
+
+# CVaR Constraints and Calcuation
+
+def cvar_first_rule(model, i, j):
+    return model.prices[i,j] - model.z - model.y[i,j] <= 0
+
+model.cvar_first_constraint = Constraint(range(price_scenarios), range(load_scenarios), rule=cvar_first_rule)
+
+def cvar_second_rule(model, i, j):
+    return model.y[i, j] >= 0
+
+model.cvar_second_constraint = Constraint(range(price_scenarios), range(load_scenarios), rule=cvar_second_rule)
 
 def cvar_calculation_rule(model):
     return model.cvar == (model.z +
-                          (1/(1 - model.alpha)) * (1/scenarios) * (sum(model.y[i] for i in range(scenarios))))
+                          (1/(1 - model.alpha)) * 1/(price_scenarios + load_scenarios) *
+                          (sum(model.y[i,j] for i in range(price_scenarios) for j in range(load_scenarios))))
 
 model.cvar_calculation_constraint = Constraint(rule=cvar_calculation_rule)
 
+
 #
-# Stage-specific cost computations
+# Stage-specific Cost Computations
 #
 
 def ComputeFirstStageCost_rule(model):
-    return model.z + (1/(1 - model.alpha)) * 1/scenarios * (sum(model.y[i] for i in range(scenarios)))
+    return 0
 
 model.FirstStageCost = Expression(rule=ComputeFirstStageCost_rule)
 
 def ComputeSecondStageCost_rule(model):
-    return sum(model.u_sch[t] * model.p_da_act[t] for t in model.T)
+    return sum(((model.l_act[t]/1000) + \
+               sum(model.c[t,i] - model.efficiency_d[i] * model.d[t,i] for i in model.i)) * \
+               model.p_da_act[t] for t in model.T)
 
 model.SecondStageCost = Expression(rule=ComputeSecondStageCost_rule)
 
@@ -169,7 +206,8 @@ model.SecondStageCost = Expression(rule=ComputeSecondStageCost_rule)
 def day_ahead_obj_rule(model):
     return sum(model.u_sch[t] * model.p_da_pred[t] for t in model.T) + \
            model.beta * (model.z + \
-                         (1/(1 - model.alpha)) * 1/scenarios * sum(model.y[i] for i in range(scenarios)))
+                         (1/(1 - model.alpha)) * 1/(price_scenarios + load_scenarios) *
+                         sum(model.y[i,j] for i in range(price_scenarios) for j in range(load_scenarios)))
 
 model.day_ahead_rule = Objective(rule=day_ahead_obj_rule, sense=minimize)
 

@@ -70,5 +70,5 @@ param gradient := 0.004 ;
 
 param alpha := 0.95 ;
 
-param beta := 10 ;
+param beta := 100 ;
 

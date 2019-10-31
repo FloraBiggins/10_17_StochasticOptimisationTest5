@@ -176,7 +176,7 @@ model.cvar_second_constraint = Constraint(range(price_scenarios), range(load_sce
 
 def cvar_calculation_rule(model):
     return model.cvar == (model.z +
-                          (1/(1 - model.alpha)) * 1/(price_scenarios + load_scenarios) *
+                          (1/(1 - model.alpha)) * 1/(price_scenarios * load_scenarios) *
                           (sum(model.y[i,j] for i in range(price_scenarios) for j in range(load_scenarios))))
 
 model.cvar_calculation_constraint = Constraint(rule=cvar_calculation_rule)
@@ -206,7 +206,7 @@ model.SecondStageCost = Expression(rule=ComputeSecondStageCost_rule)
 def day_ahead_obj_rule(model):
     return sum(model.u_sch[t] * model.p_da_pred[t] for t in model.T) + \
            model.beta * (model.z + \
-                         (1/(1 - model.alpha)) * 1/(price_scenarios + load_scenarios) *
+                         (1/(1 - model.alpha)) * 1/(price_scenarios * load_scenarios) *
                          sum(model.y[i,j] for i in range(price_scenarios) for j in range(load_scenarios)))
 
 model.day_ahead_rule = Objective(rule=day_ahead_obj_rule, sense=minimize)

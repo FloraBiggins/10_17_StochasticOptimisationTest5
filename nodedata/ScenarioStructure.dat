@@ -25,7 +25,8 @@ set StageVariables[FirstStage] :=  x[*,*]
 
 set StageVariables[SecondStage] := p_da_act[*]
                                    cvar
-                                   prices[*] ;
+                                   prices[*]
+                                   pred_cost ;
 
 param StageCost := FirstStage  FirstStageCost
                    SecondStage SecondStageCost ;

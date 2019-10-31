@@ -73,6 +73,8 @@ model.cvar = Var()
 
 model.y = Var(range(scenarios))
 
+model.pred_cost = Var()
+
 
 #
 # Constraints
@@ -104,6 +106,11 @@ def p_pm_rule(model, t):
                                                                 * model.d[t,i] for i in model.i))
 
 model.p_pm_constraint = Constraint(model.T, rule=p_pm_rule)
+
+def cost_prediction_rule(model):
+    return model.pred_cost == sum(model.p_da_pred[t] * model.u_sch[t] for t in model.T)
+
+model.cost_prediction = Constraint(rule=cost_prediction_rule)
 
 
 def random_price_matrix_rule(model, s, t):

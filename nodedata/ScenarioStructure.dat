@@ -27,7 +27,8 @@ set StageVariables[SecondStage] := p_da_act[*]
                                    cvar
                                    prices[*,*]
                                    pred_cost
-                                   load_scenarios[*,*] ;
+                                   load_scenarios[*,*]
+                                   no_storage_cost ;
 
 param StageCost := FirstStage  FirstStageCost
                    SecondStage SecondStageCost ;

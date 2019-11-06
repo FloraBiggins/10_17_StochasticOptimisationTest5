@@ -28,7 +28,7 @@ model.efficiency_c = Param(model.i, within=PositiveReals)
 
 model.efficiency_d = Param(model.i, within=PositiveReals)
 
-model.l_pred = Param(model.T, within=PositiveReals)
+model.l_pred = Param(model.T)
 
 model.p_da_pred = Param(model.T, within=PositiveReals)
 
@@ -62,6 +62,7 @@ model.d = Var(model.T, model.i, bounds=power_bounds_rule)
 
 model.u_sch = Var(model.T)
 
+
 # Price Variables
 
 model.p_pm_pred = Var(model.T)
@@ -72,9 +73,15 @@ model.prices = Var(range(price_scenarios), range(load_scenarios))
 
 model.pred_cost = Var()
 
+model.prices_no_storage = Var(range(price_scenarios), range(load_scenarios))
+
+model.no_storage_cost = Var()
+
 # Load Variables
 
 model.load_scenarios = Var(range(load_scenarios), model.T)
+
+model.load_scenarios_no_storage = Var(range(load_scenarios), model.T)
 
 model.l_act = Var(model.T)
 
@@ -123,11 +130,6 @@ model.p_pm_constraint = Constraint(model.T, rule=p_pm_rule)
 
 # Price Prediction, Scenario Matrix and Actual Price Scenario
 
-def cost_prediction_rule(model):
-    return model.pred_cost == sum(model.p_da_pred[t] * model.u_sch[t] for t in model.T)
-
-model.cost_prediction = Constraint(rule=cost_prediction_rule)
-
 def random_price_matrix_rule(model, s, t):
     return model.p_da_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05)
 
@@ -161,6 +163,19 @@ def prices_calculation_rule(model, s1, s2):
 
 model.price_calculations = Constraint(range(price_scenarios), range(load_scenarios), rule=prices_calculation_rule)
 
+def cost_expectation_rule(model):
+    return model.pred_cost == sum(model.u_sch[t] * model.p_da_pred[t] for t in model.T)
+    #model.pred_cost == sum(model.prices[s1,s2] for s1 in range(price_scenarios)
+                                  #for s2 in range(load_scenarios))/(price_scenarios*load_scenarios)
+
+model.cost_expectation = Constraint(rule=cost_expectation_rule)
+
+
+def cost_expectation_no_storage_rule(model):
+    return model.no_storage_cost == sum(model.price_scenarios[s1,t] * model.l_pred[t]/1000 for t in model.T
+                                        for s1 in range(price_scenarios))/price_scenarios
+
+model.cost_expectation_no_storage = Constraint(rule=cost_expectation_no_storage_rule)
 
 # CVaR Constraints and Calcuation
 

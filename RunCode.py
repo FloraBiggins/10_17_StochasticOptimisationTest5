@@ -9,13 +9,18 @@ import matplotlib.pyplot as plt
 
 results = pd.read_csv('ef.csv')
 
-prices = results.iloc[386:2385,4]
+prices = results.iloc[387:2386,4]
 
 var = results.iloc[119,4]
 cvar = results.iloc[120,4]
-pred_cost = results.iloc[385,4]
+pred_cost = results.iloc[386,4]
 
-print(cvar)
+no_storage_cost = results.iloc[361,4]
+
+profit = no_storage_cost - prices
+profit_cvar = no_storage_cost - cvar
+profit_var = no_storage_cost - var
+profit_pred_cost = no_storage_cost - pred_cost
 
 num_bins = 40
 n, bins, patches = plt.hist(prices, num_bins, facecolor='blue', alpha=0.4)
@@ -25,6 +30,22 @@ plt.axvline(var, color='k', linestyle='dashed', linewidth=1)
 plt.text(var-180, 55, 'VaR', fontsize=10, bbox = {'facecolor' : 'white'})
 plt.axvline(pred_cost, color='r', linestyle='dashed', linewidth=1)
 plt.text(pred_cost-180, 5, 'Predicted \n Cost', fontsize=10, color='red')
-plt.xlabel('Day-Ahead Market Generated Scenarios (£) \n 200 Cost Scenarios and 10 Load Scenarios')
+plt.xlabel('Day-Ahead Market Generated Scenarios (£)')
+plt.title('200 Cost Scenarios and 10 Load Scenarios, Uncertainty = 15%, Alpha=0.95, Beta=0.1', fontsize=10)
 plt.ylabel('Frequency')
+#plt.savefig('Images/Histogram_alpha_95_u_15_b_0p1.pdf')
+plt.show()
+
+num_bins = 40
+n, bins, patches = plt.hist(profit, num_bins, facecolor='blue', alpha=0.4)
+plt.axvline(profit_cvar, color='k', linestyle='dashed', linewidth=1)
+plt.text(profit_cvar-200, 55, 'CVaR', fontsize=10, bbox = {'facecolor' : 'white'}) #: {:.2f}.format(cvar)
+plt.axvline(profit_var, color='k', linestyle='dashed', linewidth=1)
+plt.text(profit_var-15, 55, 'VaR', fontsize=10, bbox = {'facecolor' : 'white'})
+plt.axvline(profit_pred_cost, color='r', linestyle='dashed', linewidth=1)
+plt.text(profit_pred_cost-180, 5, 'Predicted \n Profit', fontsize=10, color='red')
+plt.xlabel('Day-Ahead Market Generated Scenarios (£)')
+plt.title('200 Cost Scenarios and 10 Load Scenarios, Uncertainty = 15%, Alpha=0.95, Beta=0.1', fontsize=10)
+plt.ylabel('Frequency')
+#plt.savefig('Images/Histogram_alpha_95_u_15_b_0p1.pdf')
 plt.show()

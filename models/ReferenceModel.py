@@ -34,13 +34,15 @@ model.p_da_pred = Param(model.T, within=PositiveReals)
 
 model.gradient = Param(within=PositiveReals)
 
-model.alpha = Param(initialize=0.95, within=PositiveReals)
+model.alpha = Param(within=PositiveReals)
 
-model.beta = Param(initialize=10, within=PositiveReals)
+model.beta = Param(within=PositiveReals)
 
-price_scenarios = 200
+model.uncertainty = Param(within=PositiveReals)
 
-load_scenarios = 10
+price_scenarios = 1000
+
+load_scenarios = 1
 
 #
 # Variables
@@ -131,12 +133,14 @@ model.p_pm_constraint = Constraint(model.T, rule=p_pm_rule)
 # Price Prediction, Scenario Matrix and Actual Price Scenario
 
 def random_price_matrix_rule(model, s, t):
-    return model.p_da_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05)
+    return model.p_da_pred[t] * random.uniform(1 - model.uncertainty, 1 + model.uncertainty) \
+           + random.uniform(- model.uncertainty, model.uncertainty)
 
 model.price_scenarios = Param(range(price_scenarios), model.T, initialize=random_price_matrix_rule)
 
 def random_price_rule(model, t):
-    return model.p_da_act[t] == model.p_da_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05)
+    return model.p_da_act[t] == model.p_da_pred[t] * random.uniform(1 - model.uncertainty, 1 + model.uncertainty) \
+           + random.uniform(- model.uncertainty, model.uncertainty)
 
 model.p_da_act_constraint = Constraint(model.T, rule=random_price_rule)
 
@@ -144,14 +148,16 @@ model.p_da_act_constraint = Constraint(model.T, rule=random_price_rule)
 # Load Scenario Matrix and Actual Load
 
 def random_load_matrix_rule(model, s, t):
-    return model.load_scenarios[s, t] == (model.l_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05))/1000 + \
+    return model.load_scenarios[s, t] == (model.l_pred[t] * random.uniform(1 - model.uncertainty, 1 + model.uncertainty)
+                                          + random.uniform(- model.uncertainty, model.uncertainty))/1000 + \
            sum(model.c[t, i] - model.efficiency_d[i] * model.d[t, i] for i in model.i)
 
 model.load_scenarios_constraint = Constraint(range(load_scenarios), model.T, rule=random_load_matrix_rule)
 
 
 def random_load_rule(model, t):
-    return model.l_act[t] == model.l_pred[t] * random.uniform(0.95,1.05) + random.uniform(-0.05,0.05)
+    return model.l_act[t] == model.l_pred[t] * random.uniform(1 - model.uncertainty, 1 + model.uncertainty) \
+           + random.uniform(- model.uncertainty, model.uncertainty)
 
 model.l_act_constraint = Constraint(model.T, rule=random_load_rule)
 
